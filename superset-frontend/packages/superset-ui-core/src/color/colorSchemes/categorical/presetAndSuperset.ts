@@ -27,18 +27,18 @@ const schemes = [
     label: 'Preset + Superset',
     group: ColorSchemeGroup.Featured,
     colors: [
-      '#004960',
-      '#2893B3',
-      '#20A7C9',
-      '#5CC0DA',
-      '#7DCDE1',
-      '#A9D3E1',
-      '#C6ECE1',
-      '#AAE2D2',
-      '#71CFB4',
-      '#2FC096',
-      '#178F7A',
-      '#067162',
+      '#5A0008', // dark red
+      '#800009', // deeper red (matches dark2)
+      '#A3000A', // rich crimson
+      '#9a1018', // primary
+      '#D63F3F', // mid red
+      '#E67373', // soft red
+      '#F4A6A6', // rose
+      '#F8C5C5', // soft light rose
+      '#FADADA', // light tone
+      '#FBECEC', // very light tone
+      '#FFE5E5', // pastel blush
+      '#FFF5F5', // ultra light base
     ],
   },
 ].map(s => new CategoricalScheme(s));

@@ -54,21 +54,21 @@ export const emotionCache = createCache({
 export const styled = emotionStyled;
 
 const defaultTheme = {
-  borderRadius: 4,
+  borderRadius: 16,
   colors: {
     text: {
       label: '#879399',
       help: '#737373',
     },
     primary: {
-      base: '#20A7C9',
-      dark1: '#1A85A0',
-      dark2: '#156378',
-      light1: '#79CADE',
-      light2: '#A5DAE9',
-      light3: '#D2EDF4',
-      light4: '#E9F6F9',
-      light5: '#F3F8FA',
+      base: '#9a1018',
+      dark1: '#9A0009', // 20% darker
+      dark2: '#750006', // 40% darker
+      light1: '#D34A43', // 20% lighter
+      light2: '#E2807B', // 40% lighter
+      light3: '#F0B6B3', // 60% lighter
+      light4: '#F8D9D7', // 80% lighter
+      light5: '#FDF1F0', // 95% lighter
     },
     secondary: {
       base: '#444E7C',
