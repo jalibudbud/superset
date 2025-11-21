@@ -759,14 +759,14 @@ THEME_DEFAULT: Theme = {
         "brandSpinnerUrl": None,
         "brandSpinnerSvg": None,
         # Default colors
-        "colorPrimary": "#2893B3",  # NOTE: previous lighter primary color was #20a7c9 # noqa: E501
-        "colorLink": "#2893B3",
+        "colorPrimary": "#d71111",  # NOTE: previous lighter primary color was #20a7c9 # noqa: E501
+        "colorLink": "#d71111",
         "colorError": "#e04355",
         "colorWarning": "#fcc700",
         "colorSuccess": "#5ac189",
         "colorInfo": "#66bcfe",
         # Fonts
-        "fontFamily": "Inter, Helvetica, Arial",
+        "fontFamily": "Archivo, Inter, Helvetica, Arial",
         "fontFamilyCode": "'Fira Code', 'Courier New', monospace",
         # Extra tokens
         "transitionTiming": 0.3,
@@ -804,7 +804,10 @@ ENABLE_UI_THEME_ADMINISTRATION = True  # Allows admins to set system themes via 
 #     "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
 #     "https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500&display=swap",
 # ]
-CUSTOM_FONT_URLS: list[str] = []
+# CUSTOM_FONT_URLS: list[str] = []
+CUSTOM_FONT_URLS = [
+    "https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&display=swap"
+]
 
 # ---------------------------------------------------
 # EXTRA_SEQUENTIAL_COLOR_SCHEMES is used for adding custom sequential color schemes
@@ -1910,6 +1913,8 @@ TALISMAN_CONFIG = {
             "'unsafe-inline'",
         ],
         "script-src": ["'self'", "'strict-dynamic'"],
+        "font-src": ["'self'", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
+        "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
     },
     "content_security_policy_nonce_in": ["script-src"],
     "force_https": False,

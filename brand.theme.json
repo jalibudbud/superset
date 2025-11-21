@@ -1,0 +1,19 @@
+{
+  "token": {
+    "colorPrimary": "#d71111",
+    "colorInfo": "#d71111",
+    "colorBgBase": "#eeeeee",
+    "colorTextBase": "#201816"
+  },
+  "components": {
+    "Button": {
+      "algorithm": true
+    },
+    "Pagination": {
+      "itemBg": "rgb(255,255,255)",
+      "itemActiveBg": "rgb(32,24,22)",
+      "colorPrimaryHover": "rgb(238,238,238)",
+      "colorPrimary": "rgb(221,221,221)"
+    }
+  }
+}
