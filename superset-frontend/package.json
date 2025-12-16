@@ -387,6 +387,7 @@
   },
   "readme": "ERROR: No README data found!",
   "scarfSettings": {
+    "enabled": false,
     "allowTopLevel": true
   },
   "_id": "superset@0.0.0-dev"

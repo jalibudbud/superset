@@ -754,13 +754,13 @@ THEME_DEFAULT: Theme = {
         "brandLogoUrl": APP_ICON,
         "brandLogoMargin": "18px 0",
         "brandLogoHref": "/",
-        "brandLogoHeight": "24px",
+        "brandLogoHeight": "20px",
         # Spinner
         "brandSpinnerUrl": None,
         "brandSpinnerSvg": None,
         # Default colors
-        "colorPrimary": "#d71111",  # NOTE: previous lighter primary color was #20a7c9 # noqa: E501
-        "colorLink": "#d71111",
+        "colorPrimary": "#201816",  # NOTE: previous lighter primary color was #20a7c9 # noqa: E501
+        "colorLink": "#201816",
         "colorError": "#e04355",
         "colorWarning": "#fcc700",
         "colorSuccess": "#5ac189",

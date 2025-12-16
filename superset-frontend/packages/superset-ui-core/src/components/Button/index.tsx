@@ -70,7 +70,7 @@ export function Button(props: ButtonProps) {
     variant = 'solid';
     antdType = 'primary';
   } else if (buttonStyle === 'secondary') {
-    variant = 'filled';
+    variant = 'outlined';
     color = 'primary';
   } else if (buttonStyle === 'tertiary') {
     variant = 'outlined';
