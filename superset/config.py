@@ -750,7 +750,7 @@ EXTRA_CATEGORICAL_COLOR_SCHEMES: list[dict[str, Any]] = []
 THEME_DEFAULT: Theme = {
     "token": {
         # Brand
-        "brandLogoAlt": "Apache Superset",
+        "brandLogoAlt": "Stoksmart",
         "brandLogoUrl": APP_ICON,
         "brandLogoMargin": "18px 0",
         "brandLogoHref": "/",
@@ -765,6 +765,9 @@ THEME_DEFAULT: Theme = {
         "colorWarning": "#fcc700",
         "colorSuccess": "#5ac189",
         "colorInfo": "#66bcfe",
+        "fontUrls": [
+            "https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&display=swap"
+        ],
         # Fonts
         "fontFamily": "Archivo, Inter, Helvetica, Arial",
         "fontFamilyCode": "'Fira Code', 'Courier New', monospace",
