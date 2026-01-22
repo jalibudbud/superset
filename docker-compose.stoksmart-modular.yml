@@ -1,0 +1,169 @@
+version: '3.8'
+
+services:
+  # ===== OPTIONAL: PostgreSQL - Metadata Database =====
+  # Only needed if you don't have an external database
+  # To skip: docker-compose up -d superset (without postgres)
+  postgres:
+    image: postgres:16
+    container_name: superset_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-superset}
+      POSTGRES_USER: ${POSTGRES_USER:-superset}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-superset}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Expose port if you want to access from outside
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-superset}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - superset_network
+    profiles:
+      - full
+      - database
+
+  # ===== OPTIONAL: Redis - Cache and Celery Broker =====
+  # Only needed if you want caching or async queries
+  # To skip: docker-compose up -d superset (without redis)
+  redis:
+    image: redis:7-alpine
+    container_name: superset_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    ports:
+      # Expose port if you want to access from outside
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - superset_network
+    profiles:
+      - full
+      - cache
+
+  # ===== CORE: Superset Application =====
+  # This is the main Superset web server
+  # Always deployed, uses your pre-built image
+  superset:
+    image: ${SUPERSET_IMAGE:-yourcompany/superset:latest}
+    container_name: superset_app
+    restart: unless-stopped
+    ports:
+      - "${SUPERSET_PORT:-8088}:8088"
+    environment:
+      # Database connection (can point to external DB)
+      - DATABASE_DIALECT=${DATABASE_DIALECT:-postgresql}
+      - DATABASE_USER=${DATABASE_USER:-superset}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:-superset}
+      - DATABASE_HOST=${DATABASE_HOST:-postgres}
+      - DATABASE_PORT=${DATABASE_PORT:-5432}
+      - DATABASE_DB=${DATABASE_DB:-superset}
+      
+      # Redis connection (optional, can point to external Redis)
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT_INTERNAL:-6379}
+      
+      # Security
+      - SECRET_KEY=${SECRET_KEY:-CHANGE_THIS_SECRET_KEY}
+      - SUPERSET_ENV=${SUPERSET_ENV:-production}
+      
+      # Optional features
+      - SUPERSET_LOAD_EXAMPLES=${SUPERSET_LOAD_EXAMPLES:-no}
+    volumes:
+      - superset_home:/app/superset_home
+      # Optional: Mount custom config
+      - ./superset_config.py:/app/pythonpath/superset_config.py:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - superset_network
+    # No depends_on - can run standalone
+
+  # ===== OPTIONAL: Celery Worker =====
+  # Only needed for async queries, alerts, and reports
+  # To skip: don't include this service
+  superset-worker:
+    image: ${SUPERSET_IMAGE:-yourcompany/superset:latest}
+    container_name: superset_worker
+    restart: unless-stopped
+    command: celery --app=superset.tasks.celery_app:app worker --pool=prefork -O fair -c ${CELERY_WORKERS:-4}
+    environment:
+      - DATABASE_DIALECT=${DATABASE_DIALECT:-postgresql}
+      - DATABASE_USER=${DATABASE_USER:-superset}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:-superset}
+      - DATABASE_HOST=${DATABASE_HOST:-postgres}
+      - DATABASE_PORT=${DATABASE_PORT:-5432}
+      - DATABASE_DB=${DATABASE_DB:-superset}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT_INTERNAL:-6379}
+      - SECRET_KEY=${SECRET_KEY:-CHANGE_THIS_SECRET_KEY}
+      - SUPERSET_ENV=${SUPERSET_ENV:-production}
+    volumes:
+      - superset_home:/app/superset_home
+      - ./superset_config.py:/app/pythonpath/superset_config.py:ro
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A superset.tasks.celery_app:app inspect ping -d celery@$$HOSTNAME"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - superset_network
+    profiles:
+      - full
+      - workers
+
+  # ===== OPTIONAL: Celery Beat Scheduler =====
+  # Only needed for scheduled tasks (alerts, reports)
+  # To skip: don't include this service
+  superset-worker-beat:
+    image: ${SUPERSET_IMAGE:-yourcompany/superset:latest}
+    container_name: superset_worker_beat
+    restart: unless-stopped
+    command: celery --app=superset.tasks.celery_app:app beat --pidfile /tmp/celerybeat.pid --schedule /tmp/celerybeat-schedule
+    environment:
+      - DATABASE_DIALECT=${DATABASE_DIALECT:-postgresql}
+      - DATABASE_USER=${DATABASE_USER:-superset}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:-superset}
+      - DATABASE_HOST=${DATABASE_HOST:-postgres}
+      - DATABASE_PORT=${DATABASE_PORT:-5432}
+      - DATABASE_DB=${DATABASE_DB:-superset}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT_INTERNAL:-6379}
+      - SECRET_KEY=${SECRET_KEY:-CHANGE_THIS_SECRET_KEY}
+      - SUPERSET_ENV=${SUPERSET_ENV:-production}
+    volumes:
+      - superset_home:/app/superset_home
+      - ./superset_config.py:/app/pythonpath/superset_config.py:ro
+    networks:
+      - superset_network
+    profiles:
+      - full
+      - workers
+
+volumes:
+  # Only created if corresponding service is used
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  superset_home:
+    driver: local
+
+networks:
+  superset_network:
+    driver: bridge
