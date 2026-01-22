@@ -52,23 +52,34 @@ function formatTooltip({
   defaultFormatter,
   xAxisFormatter,
   totalMark,
+  useNonCumulative,
 }: {
   params: ICallbackDataParams[];
   breakdownName?: string;
   defaultFormatter: NumberFormatter | CurrencyFormatter;
   xAxisFormatter: (value: number | string, index: number) => string;
   totalMark: string;
+  useNonCumulative: boolean;
 }) {
   const series = params.find(
     param => param.seriesName !== ASSIST_MARK && param.data.value !== TOKEN,
   );
+
+  if (typeof console !== 'undefined') {
+    console.debug('[Waterfall] tooltip raw params', {
+      useNonCumulative,
+      params,
+      pickedSeriesName: series?.seriesName,
+      pickedData: series?.data,
+    });
+  }
 
   // We may have no matching series depending on the legend state
   if (!series) {
     return '';
   }
 
-  const isTotal = series?.seriesName === totalMark;
+  const isTotal = series.seriesName === totalMark;
   if (!series) {
     return NULL_STRING;
   }
@@ -77,7 +88,54 @@ function formatTooltip({
     !isTotal || breakdownName
       ? xAxisFormatter(series.name, series.dataIndex)
       : undefined;
+
   const rows: string[][] = [];
+
+  if (useNonCumulative && !isTotal) {
+    // Non-cumulative mode: show Start / End / Change (%)
+    const d: any = series.data || {};
+    const start = d.start;
+    const end = d.end ?? d.totalSum;
+    const absChange = d.originalValue as number | undefined;
+
+    let percentChange: number | null = null;
+    if (
+      typeof start === 'number' &&
+      start !== 0 &&
+      typeof absChange === 'number'
+    ) {
+      percentChange = (absChange / start) * 100;
+    }
+
+    if (typeof console !== 'undefined') {
+      console.debug('[Waterfall] tooltip (nonCumulative)', {
+        seriesName: series.seriesName,
+        start,
+        end,
+        absChange,
+        percentChange,
+        totalSum: d.totalSum,
+      });
+    }
+
+    if (start !== undefined) {
+      rows.push(['Start', defaultFormatter(start)]);
+    }
+    if (end !== undefined) {
+      rows.push(['End', defaultFormatter(end)]);
+    }
+
+    if (percentChange !== null) {
+      rows.push(['Change (%)', `${percentChange.toFixed(2)}%`]);
+    } else if (absChange !== undefined) {
+      // Fallback to absolute change if we cannot compute percentage (e.g. start = 0)
+      rows.push(['Change', defaultFormatter(absChange)]);
+    }
+
+    return tooltipHtml(rows, title);
+  }
+
+  // Default / cumulative mode behavior
   if (!isTotal) {
     rows.push([
       series.seriesName!,
@@ -85,6 +143,15 @@ function formatTooltip({
     ]);
   }
   rows.push([totalMark, defaultFormatter(series.data.totalSum)]);
+
+  if (typeof console !== 'undefined') {
+    console.debug('[Waterfall] tooltip (cumulative/default)', {
+      seriesName: series.seriesName,
+      isTotal,
+      rows,
+    });
+  }
+
   return tooltipHtml(rows, title);
 }
 
@@ -170,7 +237,7 @@ export default function transformProps(
     inContextMenu,
   } = chartProps;
   const refs: Refs = {};
-  const { data = [] } = queriesData[0];
+  const { data = [] } = queriesData[0] || {};
   const coltypeMapping = getColtypesMapping(queriesData[0]);
   const { setDataMask = () => {}, onContextMenu, onLegendStateChanged } = hooks;
   const {
@@ -193,7 +260,24 @@ export default function transformProps(
     totalLabel,
     increaseLabel,
     decreaseLabel,
-  } = formData;
+    // new fields
+    nonCumulative,
+    metricStart,
+    metricEnd,
+  } = formData as any;
+
+  if (typeof console !== 'undefined') {
+    console.debug('[Waterfall] transformProps called', {
+      width,
+      height,
+      dataLength: data.length,
+      nonCumulative,
+      metric,
+      metricStart,
+      metricEnd,
+    });
+  }
+
   const defaultFormatter = currencyFormat?.symbol
     ? new CurrencyFormatter({ d3Format: yAxisFormat, currency: currencyFormat })
     : getNumberFormatter(yAxisFormat);
@@ -206,10 +290,39 @@ export default function transformProps(
   };
 
   const seriesformatter = (params: ICallbackDataParams) => {
-    const { data } = params;
-    const { originalValue } = data;
-    return defaultFormatter(originalValue as number);
+    const d: any = params.data || {};
+    const originalValue = d.originalValue as number | undefined;
+
+    if (useNonCumulative) {
+      // In non-cumulative mode, show END metric on top of the bar
+      const endValue =
+        d.end ?? d.totalSum ?? originalValue ?? d.value ?? 0;
+
+      if (typeof console !== 'undefined') {
+        console.debug('[Waterfall] label formatter (nonCumulative)', {
+          seriesName: params.seriesName,
+          originalValue,
+          end: d.end,
+          totalSum: d.totalSum,
+          value: d.value,
+          endValue,
+        });
+      }
+
+      return defaultFormatter(endValue as number);
+    }
+
+    // Cumulative / default mode: keep current behavior (show change)
+    if (typeof console !== 'undefined') {
+      console.debug('[Waterfall] label formatter (cumulative/default)', {
+        seriesName: params.seriesName,
+        originalValue,
+      });
+    }
+
+    return defaultFormatter((originalValue as number) ?? 0);
   };
+
   const groupbyArray = ensureIsArray(groupby);
   const breakdownColumn = groupbyArray.length ? groupbyArray[0] : undefined;
   const breakdownName = isAdhocColumn(breakdownColumn)
@@ -220,105 +333,259 @@ export default function transformProps(
     ? xAxisColumn.label!
     : xAxisColumn;
   const metricLabel = getMetricLabel(metric);
+  const metricStartLabel = metricStart ? getMetricLabel(metricStart) : undefined;
+  const metricEndLabel = metricEnd ? getMetricLabel(metricEnd) : undefined;
 
-  const transformedData = transformer({
-    data,
-    breakdown: breakdownName,
-    xAxis: xAxisName,
-    metric: metricLabel,
-    totalMark,
-    showTotal,
-  });
+  const useNonCumulative = Boolean(
+    nonCumulative && metricStartLabel && metricEndLabel,
+  );
+
+  if (typeof console !== 'undefined') {
+    console.debug('[Waterfall] mode and labels', {
+      useNonCumulative,
+      nonCumulative,
+      metricLabel,
+      metricStartLabel,
+      metricEndLabel,
+      xAxisName,
+      breakdownName,
+    });
+  }
+
+  if (useNonCumulative && data.length > 0) {
+    const sample = data[0];
+    const startKey = metricStartLabel as string;
+    const endKey = metricEndLabel as string;
+    const startInSample = startKey in sample;
+    const endInSample = endKey in sample;
+    if (typeof console !== 'undefined') {
+      console.debug('[Waterfall] sample row keys', {
+        sampleKeys: Object.keys(sample),
+        startKey,
+        endKey,
+        startInSample,
+        endInSample,
+      });
+      if (!startInSample || !endInSample) {
+        console.warn(
+          '[Waterfall] nonCumulative enabled but start/end metrics not found in sample row',
+          {
+            metricStartLabel,
+            metricEndLabel,
+            availableKeys: Object.keys(sample),
+          },
+        );
+      }
+    }
+  }
+
+  let transformedData: DataRecord[] = [];
 
   const assistData: ISeriesData[] = [];
   const increaseData: ISeriesData[] = [];
   const decreaseData: ISeriesData[] = [];
   const totalData: ISeriesData[] = [];
 
-  let previousTotal = 0;
+  if (useNonCumulative) {
+    // Non-cumulative mode: each bar has independent start/end
+    data.forEach((row, idx) => {
+      transformedData.push(row);
 
-  transformedData.forEach((datum, index, self) => {
-    const totalSum = self.slice(0, index + 1).reduce((prev, cur, i) => {
-      if (breakdownName) {
-        if (cur[breakdownName] !== totalMark || i === 0) {
+      const isTotal =
+        (breakdownName && row[breakdownName] === totalMark) ||
+        row[xAxisName] === totalMark;
+
+      const start = Number(
+        metricStartLabel && row[metricStartLabel] != null
+          ? row[metricStartLabel]
+          : 0,
+      );
+      const end = Number(
+        metricEndLabel && row[metricEndLabel] != null
+          ? row[metricEndLabel]
+          : 0,
+      );
+      const delta = end - start;
+
+      if (typeof console !== 'undefined') {
+        console.debug('[Waterfall] row (nonCumulative)', {
+          index: idx,
+          x: row[xAxisName],
+          breakdown: breakdownName ? row[breakdownName] : undefined,
+          start,
+          end,
+          delta,
+          isTotal,
+        });
+      }
+
+      if (isTotal) {
+        // "Total" bar: stand-alone, from 0 to end
+        assistData.push({ value: TOKEN });
+        increaseData.push({ value: TOKEN });
+        decreaseData.push({ value: TOKEN });
+        totalData.push({
+          value: end,
+          originalValue: end,
+          totalSum: end,
+          start: 0,
+          end,
+        } as any);
+      } else {
+        // Normal bar: base = start, visible = delta
+        // Make assist bar transparent so only delta is visible
+        assistData.push({
+          value: start,
+          itemStyle: { color: 'transparent' },
+        });
+
+        if (delta >= 0) {
+          increaseData.push({
+            value: delta,
+            originalValue: delta,
+            totalSum: end,
+            start,
+            end,
+          } as any);
+          decreaseData.push({ value: TOKEN });
+        } else {
+          // negative delta: show as "decrease"
+          increaseData.push({ value: TOKEN });
+          decreaseData.push({
+            value: -delta,
+            originalValue: delta,
+            totalSum: end,
+            start,
+            end,
+          } as any);
+        }
+
+        // No standalone total series for normal bars
+        totalData.push({ value: TOKEN });
+      }
+    });
+
+    if (typeof console !== 'undefined') {
+      console.debug(
+        '[Waterfall] nonCumulative series samples',
+        {
+          assist: assistData.slice(0, 5),
+          increase: increaseData.slice(0, 5),
+          decrease: decreaseData.slice(0, 5),
+          total: totalData.slice(0, 5),
+        },
+      );
+    }
+  } else {
+    // Original cumulative waterfall behaviour
+    const transformed = transformer({
+      data,
+      breakdown: breakdownName,
+      xAxis: xAxisName,
+      metric: metricLabel,
+      totalMark,
+      showTotal,
+    });
+
+    transformedData = transformed;
+
+    let previousTotal = 0;
+
+    transformedData.forEach((datum, index, self) => {
+      const totalSum = self.slice(0, index + 1).reduce((prev, cur, i) => {
+        if (breakdownName) {
+          if (cur[breakdownName] !== totalMark || i === 0) {
+            return prev + ((cur[metricLabel] as number) ?? 0);
+          }
+        } else if (cur[xAxisName] !== totalMark) {
           return prev + ((cur[metricLabel] as number) ?? 0);
         }
-      } else if (cur[xAxisName] !== totalMark) {
-        return prev + ((cur[metricLabel] as number) ?? 0);
+        return prev;
+      }, 0);
+
+      const isTotal =
+        (breakdownName && datum[breakdownName] === totalMark) ||
+        datum[xAxisName] === totalMark;
+
+      const originalValue = datum[metricLabel] as number;
+      let value = originalValue;
+      const oppositeSigns = Math.sign(previousTotal) !== Math.sign(totalSum);
+      if (oppositeSigns) {
+        value = Math.sign(value) * (Math.abs(value) - Math.abs(previousTotal));
       }
-      return prev;
-    }, 0);
 
-    const isTotal =
-      (breakdownName && datum[breakdownName] === totalMark) ||
-      datum[xAxisName] === totalMark;
+      if (isTotal) {
+        increaseData.push({ value: TOKEN });
+        decreaseData.push({ value: TOKEN });
+        totalData.push({
+          value: totalSum,
+          originalValue: totalSum,
+          totalSum,
+        });
+      } else if (value < 0) {
+        increaseData.push({ value: TOKEN });
+        decreaseData.push({
+          value: totalSum < 0 ? value : -value,
+          originalValue,
+          totalSum,
+        });
+        totalData.push({ value: TOKEN });
+      } else {
+        increaseData.push({
+          value: totalSum > 0 ? value : -value,
+          originalValue,
+          totalSum,
+        });
+        decreaseData.push({ value: TOKEN });
+        totalData.push({ value: TOKEN });
+      }
 
-    const originalValue = datum[metricLabel] as number;
-    let value = originalValue;
-    const oppositeSigns = Math.sign(previousTotal) !== Math.sign(totalSum);
-    if (oppositeSigns) {
-      value = Math.sign(value) * (Math.abs(value) - Math.abs(previousTotal));
+      const color = oppositeSigns
+        ? value > 0
+          ? rgbToHex(increaseColor.r, increaseColor.g, increaseColor.b)
+          : rgbToHex(decreaseColor.r, decreaseColor.g, decreaseColor.b)
+        : 'transparent';
+
+      let opacity = 1;
+      if (legendState?.[legendNames.INCREASE] === false && value > 0) {
+        opacity = 0;
+      } else if (legendState?.[legendNames.DECREASE] === false && value < 0) {
+        opacity = 0;
+      }
+
+      if (isTotal) {
+        assistData.push({ value: TOKEN });
+      } else if (index === 0) {
+        assistData.push({
+          value: 0,
+        });
+      } else if (
+        oppositeSigns ||
+        Math.abs(totalSum) > Math.abs(previousTotal)
+      ) {
+        assistData.push({
+          value: previousTotal,
+          itemStyle: { color, opacity },
+        });
+      } else {
+        assistData.push({
+          value: totalSum,
+          itemStyle: { color, opacity },
+        });
+      }
+
+      previousTotal = totalSum;
+    });
+
+    if (typeof console !== 'undefined') {
+      console.debug('[Waterfall] cumulative series samples', {
+        assist: assistData.slice(0, 5),
+        increase: increaseData.slice(0, 5),
+        decrease: decreaseData.slice(0, 5),
+        total: totalData.slice(0, 5),
+      });
     }
-
-    if (isTotal) {
-      increaseData.push({ value: TOKEN });
-      decreaseData.push({ value: TOKEN });
-      totalData.push({
-        value: totalSum,
-        originalValue: totalSum,
-        totalSum,
-      });
-    } else if (value < 0) {
-      increaseData.push({ value: TOKEN });
-      decreaseData.push({
-        value: totalSum < 0 ? value : -value,
-        originalValue,
-        totalSum,
-      });
-      totalData.push({ value: TOKEN });
-    } else {
-      increaseData.push({
-        value: totalSum > 0 ? value : -value,
-        originalValue,
-        totalSum,
-      });
-      decreaseData.push({ value: TOKEN });
-      totalData.push({ value: TOKEN });
-    }
-
-    const color = oppositeSigns
-      ? value > 0
-        ? rgbToHex(increaseColor.r, increaseColor.g, increaseColor.b)
-        : rgbToHex(decreaseColor.r, decreaseColor.g, decreaseColor.b)
-      : 'transparent';
-
-    let opacity = 1;
-    if (legendState?.[legendNames.INCREASE] === false && value > 0) {
-      opacity = 0;
-    } else if (legendState?.[legendNames.DECREASE] === false && value < 0) {
-      opacity = 0;
-    }
-
-    if (isTotal) {
-      assistData.push({ value: TOKEN });
-    } else if (index === 0) {
-      assistData.push({
-        value: 0,
-      });
-    } else if (oppositeSigns || Math.abs(totalSum) > Math.abs(previousTotal)) {
-      assistData.push({
-        value: previousTotal,
-        itemStyle: { color, opacity },
-      });
-    } else {
-      assistData.push({
-        value: totalSum,
-        itemStyle: { color, opacity },
-      });
-    }
-
-    previousTotal = totalSum;
-  });
+  }
 
   const xAxisColumns: string[] = [];
   const xAxisData = transformedData.map(row => {
@@ -474,10 +741,21 @@ export default function transformProps(
           defaultFormatter,
           xAxisFormatter,
           totalMark,
+          useNonCumulative,
         }),
     },
     series: barSeries,
   };
+
+  if (typeof console !== 'undefined') {
+    console.debug('[Waterfall] final echartOptions.series summary', {
+      assistLen: assistData.length,
+      increaseLen: increaseData.length,
+      decreaseLen: decreaseData.length,
+      totalLen: totalData.length,
+      xAxisLen: xAxisData.length,
+    });
+  }
 
   return {
     refs,

@@ -61,10 +61,14 @@ export type EchartsWaterfallFormData = QueryFormData &
     decreaseLabel?: string;
     totalLabel?: string;
     showTotal: boolean;
+    nonCumulative?: boolean;
+    metricStart?: QueryFormMetric;
+    metricEnd?: QueryFormMetric;
   };
 
 export const DEFAULT_FORM_DATA: Partial<EchartsWaterfallFormData> = {
   showLegend: true,
+  nonCumulative: false,
 };
 
 export interface EchartsWaterfallChartProps extends ChartProps {

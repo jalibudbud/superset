@@ -23,16 +23,39 @@ import {
 } from '@superset-ui/core';
 
 export default function buildQuery(formData: QueryFormData) {
-  const { x_axis, granularity_sqla, groupby } = formData;
+  const {
+    x_axis,
+    granularity_sqla,
+    groupby,
+    nonCumulative,
+    metricStart,
+    metricEnd,
+  } = formData as any;
+
   const columns = [
     ...ensureIsArray(x_axis || granularity_sqla),
     ...ensureIsArray(groupby),
   ];
-  return buildQueryContext(formData, baseQueryObject => [
-    {
+
+  return buildQueryContext(formData, baseQueryObject => {
+    const queryObject: any = {
       ...baseQueryObject,
       columns,
       orderby: columns?.map(column => [column, true]),
-    },
-  ]);
+    };
+
+    // Only override metrics in non-cumulative mode
+    if (nonCumulative) {
+      const metrics = [
+        ...ensureIsArray(metricStart),
+        ...ensureIsArray(metricEnd),
+      ].filter(Boolean);
+
+      if (metrics.length) {
+        queryObject.metrics = metrics;
+      }
+    }
+
+    return [queryObject];
+  });
 }

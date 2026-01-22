@@ -143,6 +143,42 @@ const config: ControlPanelConfig = {
         ],
         [
           {
+            name: 'nonCumulative',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Non-cumulative mode'),
+              default: false,
+              description: t(
+                'Treat each bar as independent start/end, not running total',
+              ),
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'metricStart',
+            config: {
+              ...sharedControls.metric,
+              label: t('Start metric'),
+              description: t('Metric defining the start of each bar'),
+              multi: false,
+            },
+          },
+        ],
+        [
+          {
+            name: 'metricEnd',
+            config: {
+              ...sharedControls.metric,
+              label: t('End metric'),
+              description: t('Metric defining the end of each bar'),
+              multi: false,
+            },
+          },
+        ],
+        [
+          {
             name: 'total_color',
             config: {
               label: t('Total color'),
